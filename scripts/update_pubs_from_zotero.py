@@ -38,6 +38,7 @@ ZOTERO_DB   = os.path.expanduser(r"~\Zotero\zotero.sqlite")
 COLLECTION  = 54  # Nano_Lab_published_papers
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE   = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "publication-patent.html"))
+INDEX_FILE  = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "index.html"))
 
 
 def normalize(text):
@@ -144,6 +145,20 @@ def update_html(new_rows, total_count):
 
     with open(HTML_FILE, "w", encoding="utf-8") as f:
         f.write(content)
+
+    # Also update homepage stats bar counter
+    if os.path.exists(INDEX_FILE):
+        with open(INDEX_FILE, "r", encoding="utf-8") as f:
+            idx = f.read()
+        idx = re.sub(
+            r'data-count="\d+"(.*?>0</div>\s*\n\s*<div class="stat-label">Publications)',
+            f'data-count="{total_count}"\\1',
+            idx
+        )
+        with open(INDEX_FILE, "w", encoding="utf-8") as f:
+            f.write(idx)
+        print(f"  Homepage stats bar updated to {total_count}")
+
     return True
 
 
