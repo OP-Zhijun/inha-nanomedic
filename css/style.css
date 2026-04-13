@@ -335,10 +335,10 @@ section { padding: 120px 56px; }
 }
 .pillar p { font-size: 0.95rem; color: var(--muted); line-height: 1.7; }
 
-/* ── RESEARCH CARDS ── */
+/* ── RESEARCH CARDS — full-width stacked, landscape ── */
 .research { background: var(--navy); }
 .research-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
+  display: grid; grid-template-columns: 1fr; gap: 48px;
   margin-top: 56px;
   max-width: 1200px;
 }
@@ -352,39 +352,21 @@ section { padding: 120px 56px; }
   display: flex;
   flex-direction: column;
 }
-.research-card:last-child {
-  grid-column: 1 / -1;
-  max-width: 600px;
-}
 
-/* Research card image — full-bleed with fade */
+/* White container for research images (images have white backgrounds) */
 .card-img {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
   display: block;
   border-radius: 4px 4px 0 0;
-}
-/* Gradient overlay to dissolve black image edge into card bg */
-.card-img + .card-num::before {
-  content: '';
-  display: block;
-  height: 40px;
-  margin-top: -40px;
-  margin-bottom: 20px;
-  margin-left: -36px;
-  margin-right: -36px;
-  background: linear-gradient(to bottom, transparent, var(--deep));
-  pointer-events: none;
+  background: #ffffff;
+  padding: 12px;
 }
 
 .card-num {
   font-family: 'Cormorant Garamond', serif; font-size: 3.5rem;
   font-weight: 300; color: rgba(74,144,196,0.2);
-  line-height: 1; margin-bottom: 20px;
-  position: absolute;
-  top: 140px; left: 20px; z-index: 3;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  line-height: 1; margin: 24px 0 16px;
+  padding-left: 36px;
 }
 
 /* Card text content gets padding */
