@@ -146,17 +146,18 @@ def update_html(new_rows, total_count):
     with open(HTML_FILE, "w", encoding="utf-8") as f:
         f.write(content)
 
-    # Also update homepage stats bar counter
+    # Also update homepage stats bar counter (line-by-line to avoid regex corruption)
     if os.path.exists(INDEX_FILE):
         with open(INDEX_FILE, "r", encoding="utf-8") as f:
-            idx = f.read()
-        idx = re.sub(
-            r'data-count="\d+"(.*?>0</div>\s*\n\s*<div class="stat-label">Publications)',
-            f'data-count="{total_count}"\\1',
-            idx
-        )
+            lines = f.readlines()
+        for i, line in enumerate(lines):
+            if 'data-count="' in line and i + 1 < len(lines) and "Publications" in lines[i + 1]:
+                old = re.search(r'data-count="(\d+)"', line)
+                if old:
+                    lines[i] = line.replace(f'data-count="{old.group(1)}"', f'data-count="{total_count}"')
+                    break
         with open(INDEX_FILE, "w", encoding="utf-8") as f:
-            f.write(idx)
+            f.writelines(lines)
         print(f"  Homepage stats bar updated to {total_count}")
 
     return True
