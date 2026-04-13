@@ -176,7 +176,8 @@ for name, html in pages.items():
 img_pattern = re.compile(r'src="(assets/[^"]+)"')
 for name, html in pages.items():
     for img_path in img_pattern.findall(html):
-        full_path = os.path.join(site_dir, img_path)
+        clean_path = img_path.split('?')[0]  # strip query params (?v=2 etc.)
+        full_path = os.path.join(site_dir, clean_path)
         if not os.path.exists(full_path):
             errors.append(f'FAIL: {name}: broken image — {img_path} does not exist')
 
