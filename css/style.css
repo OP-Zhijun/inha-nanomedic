@@ -975,6 +975,62 @@ footer {
   width: 6px; height: 1px; background: var(--teal);
 }
 
+/* ── GALLERY MOSAIC ── */
+.gallery-mosaic {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 260px;
+  gap: 6px;
+  grid-auto-flow: dense;
+  max-width: 1200px;
+  margin-top: 56px;
+}
+.gallery-cell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--navy);
+}
+.gallery-cell.hero { grid-column: span 2; }
+.gallery-cell.portrait { grid-row: span 2; }
+
+.gallery-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.88) brightness(0.85);
+  transition: filter 0.6s ease, transform 1s cubic-bezier(0.25, 0, 0.15, 1);
+}
+.gallery-cell:hover img {
+  filter: saturate(1.08) brightness(1.02);
+  transform: scale(1.05);
+}
+/* Teal accent line on hover — matches facility cards */
+.gallery-cell::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--teal), var(--accent));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s ease;
+  z-index: 2;
+}
+.gallery-cell:hover::after { transform: scaleX(1); }
+/* Vignette overlay for depth */
+.gallery-cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(10,22,40,0.35) 100%);
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 0.5s;
+}
+.gallery-cell:hover::before { opacity: 0.3; }
+
 /* ── ACCESSIBILITY ── */
 @media (prefers-reduced-motion: reduce) {
   .hero-dots, .page-hero-dots { animation: none; }
@@ -1003,6 +1059,9 @@ footer {
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
 
 
+  /* Gallery: 2-col on tablet */
+  .gallery-mosaic { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 240px; gap: 5px; }
+
   /* Tablet: make publication table more compact */
   .patent-table td { padding: 14px 12px; font-size: 0.84rem; }
   .patent-table td:first-child { font-size: 0.86rem; }
@@ -1017,6 +1076,14 @@ footer {
 /* ── PHONE LANDSCAPE / SMALL TABLET ── */
 @media (max-width: 768px) {
   :root { --nav-height: 52px; }
+
+  /* Gallery: single column on mobile, natural aspect ratio */
+  .gallery-mosaic { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 8px; }
+  .gallery-cell.hero,
+  .gallery-cell.portrait { grid-column: span 1; grid-row: span 1; }
+  .gallery-cell img { height: auto; filter: none; }
+  .gallery-cell:hover img { transform: none; }
+
   /* Nav — touch-friendly hamburger */
   nav { padding: 14px 20px; }
   nav.scrolled { padding: 10px 20px; }
