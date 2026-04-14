@@ -785,10 +785,6 @@ section { padding: 120px 56px; }
   transform: scaleX(1);
 }
 
-/* Last-row stretch — eliminate blank cells in 3-col grid */
-.fac-grid > .fac-item:last-child:nth-child(3n+1) { grid-column: 1 / -1; }
-.fac-grid > .fac-item:last-child:nth-child(3n+2) { grid-column: span 2; }
-
 /* Responsive — tablet */
 @media (max-width: 1024px) {
   .facilities-catalog { padding: 80px 40px; }
