@@ -703,11 +703,9 @@ section { padding: 120px 56px; }
 .fac-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
+  gap: 16px;
   max-width: 1280px;
   margin: 0 auto 40px;
-  background: rgba(74,144,196,0.15);
-  border: 1px solid rgba(74,144,196,0.15);
 }
 
 /* Individual equipment card */
@@ -719,6 +717,8 @@ section { padding: 120px 56px; }
   position: relative;
   overflow: hidden;
   transition: background 0.3s;
+  border: 1px solid rgba(74,144,196,0.12);
+  border-radius: 4px;
 }
 .fac-item:hover {
   background: #0c1a30;
