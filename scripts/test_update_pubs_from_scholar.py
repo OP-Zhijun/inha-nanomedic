@@ -25,6 +25,20 @@ def test_parse_existing_rows_extracts_title_year_raw():
     assert by_title["Older Paper About Liposomes"]["raw"].startswith("<tr><td>Older Paper")
     assert by_title["Older Paper About Liposomes"]["raw"].endswith("</tr>")
 
+def test_parse_unescapes_html_entities_for_dedup():
+    html = ('<tbody>\n'
+            '          <tr><td>Cancer Research &amp; Treatment</td>'
+            '<td>Materials &amp; Interfaces</td><td>2020</td>'
+            '<td><a href="x">DOI</a></td></tr>\n'
+            '        </tbody>')
+    rows = m.parse_existing_rows(html)
+    assert rows[0]["title"] == "Cancer Research & Treatment"
+    assert rows[0]["journal"] == "Materials & Interfaces"
+    # de-dup parity: the normalized stored title must equal the normalized
+    # plain-text Scholar title (no stray "amp" from a leftover &amp;)
+    assert rows[0]["norm"] == m.normalize("Cancer Research & Treatment")
+    assert "amp" not in rows[0]["norm"]
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))

@@ -43,8 +43,9 @@ def parse_existing_rows(html_content):
     region = html_content[start:end] if start != -1 and end != -1 else html_content
     rows = []
     for mt in ROW_RE.finditer(region):
-        title_raw, journal, year_raw, link = mt.groups()
-        title = re.sub(r"<[^>]+>", "", title_raw).strip()
+        title_raw, journal_raw, year_raw, link = mt.groups()
+        title = html_mod.unescape(re.sub(r"<[^>]+>", "", title_raw)).strip()
+        journal = html_mod.unescape(re.sub(r"<[^>]+>", "", journal_raw)).strip()
         rows.append({
             "raw": mt.group(0),
             "title": title,
