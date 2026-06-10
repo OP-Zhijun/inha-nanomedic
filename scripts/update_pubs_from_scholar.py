@@ -54,3 +54,32 @@ def parse_existing_rows(html_content):
             "norm": normalize(title),
         })
     return rows
+
+
+ROW_INDENT = "          "  # 10 spaces, matches publication-patent.html
+
+
+def resort_tbody(html_content, new_row_strings):
+    """Rebuild the <tbody> with existing + new rows, sorted year-descending.
+
+    Existing rows are re-emitted from their preserved raw HTML (unchanged).
+    Sort is stable: within the same year, existing rows keep their prior order
+    and new rows follow them. Only ordering changes — no row is edited/dropped.
+    """
+    existing = parse_existing_rows(html_content)
+    combined = [{"year": r["year"], "raw": r["raw"]} for r in existing]
+    for s in new_row_strings:
+        mt = ROW_RE.search(s)
+        yr = _year_to_int(mt.group(3)) if mt else 0
+        combined.append({"year": yr, "raw": s.strip()})
+
+    combined.sort(key=lambda r: -r["year"])  # stable; preserves same-year order
+
+    body = "\n".join(ROW_INDENT + r["raw"] for r in combined)
+    new_tbody = "<tbody>\n" + body + "\n" + ROW_INDENT[:-2] + "</tbody>"
+
+    start = html_content.find("<tbody>")
+    end = html_content.find("</tbody>") + len("</tbody>")
+    if start == -1 or end == -1:
+        raise ValueError("tbody not found in HTML")
+    return html_content[:start] + new_tbody + html_content[end:]

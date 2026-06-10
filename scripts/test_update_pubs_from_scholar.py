@@ -39,6 +39,30 @@ def test_parse_unescapes_html_entities_for_dedup():
     assert rows[0]["norm"] == m.normalize("Cancer Research & Treatment")
     assert "amp" not in rows[0]["norm"]
 
+def test_resort_orders_year_descending():
+    html = load_fixture()
+    out = m.resort_tbody(html, [])  # no new rows
+    rows = m.parse_existing_rows(out)
+    years = [r["year"] for r in rows]
+    assert years == sorted(years, reverse=True)   # 2023 before 2019
+
+def test_resort_zero_new_loses_no_rows():
+    """Safety invariant: with no new rows, the SAME set of <tr> survives."""
+    html = load_fixture()
+    before = {r["raw"] for r in m.parse_existing_rows(html)}
+    out = m.resort_tbody(html, [])
+    after = {r["raw"] for r in m.parse_existing_rows(out)}
+    assert before == after          # nothing dropped, nothing altered
+
+def test_resort_inserts_new_row_in_year_order():
+    html = load_fixture()
+    new = ["<tr><td>Mid Paper</td><td>ACS Nano</td><td>2021</td><td><a href=\"d\">DOI</a></td></tr>"]
+    out = m.resort_tbody(html, new)
+    rows = m.parse_existing_rows(out)
+    years = [r["year"] for r in rows]
+    assert years == [2023, 2021, 2019]   # 2021 lands between, not at the top
+    assert any(r["title"] == "Mid Paper" for r in rows)
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
