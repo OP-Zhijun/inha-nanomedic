@@ -70,7 +70,9 @@ def resort_tbody(html_content, new_row_strings):
     combined = [{"year": r["year"], "raw": r["raw"]} for r in existing]
     for s in new_row_strings:
         mt = ROW_RE.search(s)
-        yr = _year_to_int(mt.group(3)) if mt else 0
+        if mt is None:
+            raise ValueError(f"new row string does not match expected <tr> format: {s!r}")
+        yr = _year_to_int(mt.group(3))
         combined.append({"year": yr, "raw": s.strip()})
 
     combined.sort(key=lambda r: -r["year"])  # stable; preserves same-year order
@@ -79,7 +81,8 @@ def resort_tbody(html_content, new_row_strings):
     new_tbody = "<tbody>\n" + body + "\n" + ROW_INDENT[:-2] + "</tbody>"
 
     start = html_content.find("<tbody>")
-    end = html_content.find("</tbody>") + len("</tbody>")
-    if start == -1 or end == -1:
+    end_raw = html_content.find("</tbody>")
+    if start == -1 or end_raw == -1:
         raise ValueError("tbody not found in HTML")
+    end = end_raw + len("</tbody>")
     return html_content[:start] + new_tbody + html_content[end:]

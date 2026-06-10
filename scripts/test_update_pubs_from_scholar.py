@@ -63,6 +63,17 @@ def test_resort_inserts_new_row_in_year_order():
     assert years == [2023, 2021, 2019]   # 2021 lands between, not at the top
     assert any(r["title"] == "Mid Paper" for r in rows)
 
+def test_resort_raises_when_tbody_missing():
+    import pytest
+    with pytest.raises(ValueError):
+        m.resort_tbody("<html><body>no table here</body></html>", [])
+
+def test_resort_raises_on_malformed_new_row():
+    import pytest
+    html = load_fixture()
+    with pytest.raises(ValueError):
+        m.resort_tbody(html, ["<tr><td colspan=2>broken</td></tr>"])
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
