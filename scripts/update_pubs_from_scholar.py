@@ -196,3 +196,135 @@ def crossref_lookup(title):
     except requests.RequestException:
         return None
     return crossref_best_match(title, items)
+
+
+# ── Orchestration / CLI ──
+import os       # noqa: E402
+import sys      # noqa: E402
+import argparse # noqa: E402
+import shutil   # noqa: E402
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+HTML_FILE = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "publication-patent.html"))
+INDEX_FILE = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "index.html"))
+PREVIEW_FILE = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "publication-patent.preview.html"))
+
+
+def build_new_rows(papers):
+    """Build single-line <tr> strings for verified new papers (DOI link)."""
+    rows = []
+    for p in papers:
+        t = html_mod.escape(p["title"])
+        j = html_mod.escape(p["journal"])
+        y = html_mod.escape(p["year"])
+        url = f"https://doi.org/{html_mod.escape(p['doi'])}"
+        link = (f'<a href="{url}" target="_blank" '
+                f'rel="noopener noreferrer" class="btn-outline btn-small">DOI</a>')
+        rows.append(f"<tr><td>{t}</td><td>{j}</td><td>{y}</td><td>{link}</td></tr>")
+    return rows
+
+
+def write_report(path, added, filtered):
+    lines = []
+    if added:
+        lines.append(f"### {len(added)} new publication(s) added\n")
+        for p in added:
+            lines.append(f"- **[{p['year']}]** {p['title']}  \n  "
+                         f"_{p['journal']}_ — https://doi.org/{p['doi']}")
+    else:
+        lines.append("### No new publications this run\n")
+    if filtered:
+        lines.append(f"\n### {len(filtered)} entr(y/ies) filtered out (NOT published — review)\n")
+        for f in filtered:
+            lines.append(f"- {f['title']}  _(reason: {f['reason']})_")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--dry-run", action="store_true",
+                   help="write to publication-patent.preview.html, never the live file")
+    g.add_argument("--apply", action="store_true",
+                   help="write the live publication-patent.html and index.html (PR branch only)")
+    ap.add_argument("--report", default=os.path.join(SCRIPT_DIR, "..", "scholar_update_report.md"))
+    args = ap.parse_args()
+    if not args.dry_run and not args.apply:
+        args.dry_run = True  # safe default
+
+    api_key = os.environ.get("SERPAPI_KEY")
+    if not api_key:
+        print("ERROR: SERPAPI_KEY environment variable not set.")
+        sys.exit(2)
+
+    with open(HTML_FILE, encoding="utf-8") as f:
+        pub_html = f.read()
+    existing = parse_existing_rows(pub_html)
+    existing_norms = {r["norm"] for r in existing}
+    print(f"{len(existing)} papers already on the site.")
+
+    scholar = fetch_scholar_articles(api_key)
+    print(f"{len(scholar)} entries on Google Scholar.")
+
+    new_candidates, seen = [], set()
+    for s in scholar:
+        n = normalize(s["title"])
+        if not n or n in existing_norms or n in seen:
+            continue
+        seen.add(n)
+        new_candidates.append(s)
+    print(f"{len(new_candidates)} candidate new title(s) after diff.")
+
+    added, filtered = [], []
+    for s in new_candidates:
+        match = crossref_lookup(s["title"])
+        if match and match["doi"]:
+            added.append({
+                "title": s["title"],
+                "journal": match["journal"] or s["venue"],
+                "year": match["year"] or s["year"],
+                "doi": match["doi"],
+            })
+        else:
+            reason = "no-crossref-journal-match"
+            filtered.append({"title": s["title"], "reason": reason})
+
+    # House rule: show the first <=5 detected papers for verification.
+    print("\nFirst detected new papers (verify before publishing):")
+    for i, p in enumerate(added[:5], 1):
+        print(f"  {i}. [{p['year']}] {p['title'][:75]}  (DOI {p['doi']})")
+    if filtered:
+        print(f"\n{len(filtered)} filtered (not published):")
+        for f in filtered[:5]:
+            print(f"  - {f['title'][:75]}  ({f['reason']})")
+
+    write_report(args.report, added, filtered)
+
+    if not added:
+        print("\nNothing verified to add. Site untouched.")
+        return
+
+    new_rows = build_new_rows(added)
+    total = len(existing) + len(added)
+    new_pub_html = resort_tbody(pub_html, new_rows)
+    with open(INDEX_FILE, encoding="utf-8") as f:
+        index_html = f.read()
+    new_pub_html, new_index_html = update_counters(new_pub_html, index_html, total)
+
+    if args.dry_run:
+        shutil.copy2(HTML_FILE, PREVIEW_FILE + ".orig")  # keep a reference copy
+        with open(PREVIEW_FILE, "w", encoding="utf-8") as f:
+            f.write(new_pub_html)
+        print(f"\nDRY RUN: wrote preview to {PREVIEW_FILE} (live file untouched). "
+              f"Total would be {total}.")
+    else:
+        with open(HTML_FILE, "w", encoding="utf-8") as f:
+            f.write(new_pub_html)
+        with open(INDEX_FILE, "w", encoding="utf-8") as f:
+            f.write(new_index_html)
+        print(f"\nAPPLIED: added {len(added)} paper(s). Total now {total}.")
+
+
+if __name__ == "__main__":
+    main()

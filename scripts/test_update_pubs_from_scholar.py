@@ -137,6 +137,17 @@ def test_update_counters_only_publications_stat_and_keeps_suffix():
     assert 'data-count="20" data-suffix="+"' in out   # Years untouched
     assert 'data-count="3" data-suffix=""' in out     # Research Areas untouched
 
+def test_build_new_rows_doi_link_and_escaping():
+    papers = [{"title": "Nano & Cancer <Study>", "journal": "ACS Nano",
+               "year": "2025", "doi": "10.1/xyz"}]
+    rows = m.build_new_rows(papers)
+    assert len(rows) == 1
+    row = rows[0]
+    assert "Nano &amp; Cancer &lt;Study&gt;" in row     # escaped
+    assert 'href="https://doi.org/10.1/xyz"' in row
+    assert 'rel="noopener noreferrer"' in row           # qa_check.py requires this
+    assert row.startswith("<tr><td>") and row.endswith("</tr>")
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
