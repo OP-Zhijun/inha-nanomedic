@@ -101,6 +101,10 @@ def crossref_best_match(title, items):
     want = normalize(title)
     best, best_score = None, 0.0
     for it in items:
+        # Only journal-articles are eligible: a same-title preprint/proceedings
+        # must never out-rank (and thereby suppress) the real journal article.
+        if it.get("type") != "journal-article":
+            continue
         cand_titles = it.get("title") or []
         if not cand_titles:
             continue
@@ -108,8 +112,6 @@ def crossref_best_match(title, items):
         if score > best_score:
             best, best_score = it, score
     if best is None or best_score < SIMILARITY_THRESHOLD:
-        return None
-    if best.get("type") != "journal-article":
         return None
     journal_list = best.get("container-title") or [""]
     parts = best.get("issued", {}).get("date-parts", [[None]])
@@ -187,14 +189,16 @@ def fetch_scholar_articles(api_key):
 
 
 def crossref_lookup(title):
-    """Query Crossref by title; return {doi, journal, year} or None (uses the filter)."""
+    """Query Crossref by title; return {doi, journal, year} or None (uses the filter).
+
+    Raises requests.RequestException on a transient network/HTTP error so the
+    caller can distinguish "couldn't check" from a genuine "no journal match"
+    (the latter is real junk; the former should be retried, not filtered).
+    """
     params = {"query.bibliographic": title, "rows": 5, "mailto": POLITE_MAILTO}
-    try:
-        resp = requests.get(CROSSREF_URL, params=params, timeout=60)
-        resp.raise_for_status()
-        items = resp.json().get("message", {}).get("items", [])
-    except requests.RequestException:
-        return None
+    resp = requests.get(CROSSREF_URL, params=params, timeout=60)
+    resp.raise_for_status()
+    items = resp.json().get("message", {}).get("items", [])
     return crossref_best_match(title, items)
 
 
@@ -278,7 +282,14 @@ def main():
 
     added, filtered = [], []
     for s in new_candidates:
-        match = crossref_lookup(s["title"])
+        try:
+            match = crossref_lookup(s["title"])
+        except requests.RequestException as exc:
+            # Transient Crossref failure — hold the paper back (don't add) but
+            # flag it distinctly so it's clearly "retry next run", not junk.
+            print(f"  ! Crossref error for {s['title'][:60]!r}: {exc}", file=sys.stderr)
+            filtered.append({"title": s["title"], "reason": "crossref-error (transient — will retry)"})
+            continue
         if match and match["doi"]:
             added.append({
                 "title": s["title"],
@@ -287,8 +298,7 @@ def main():
                 "doi": match["doi"],
             })
         else:
-            reason = "no-crossref-journal-match"
-            filtered.append({"title": s["title"], "reason": reason})
+            filtered.append({"title": s["title"], "reason": "no-crossref-journal-match"})
 
     # House rule: show the first <=5 detected papers for verification.
     print("\nFirst detected new papers (verify before publishing):")

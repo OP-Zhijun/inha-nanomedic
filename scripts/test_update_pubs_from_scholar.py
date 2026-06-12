@@ -107,6 +107,21 @@ def test_crossref_match_rejects_low_similarity():
 def test_crossref_match_empty_items():
     assert m.crossref_best_match("Anything", []) is None
 
+def test_crossref_match_prefers_journal_article_over_preprint():
+    # Crossref often returns a preprint (posted-content) AND the final journal
+    # article for the same title. The journal article must win even when the
+    # preprint is listed first with an equal title score (review finding).
+    items = [
+        _crossref_item("Targeted Nanoparticles For Colon Cancer", "posted-content",
+                       "10.1101/preprint", "bioRxiv", 2024),
+        _crossref_item("Targeted Nanoparticles For Colon Cancer", "journal-article",
+                       "10.3390/final", "ACS Nano", 2025),
+    ]
+    r = m.crossref_best_match("Targeted Nanoparticles For Colon Cancer", items)
+    assert r is not None
+    assert r["doi"] == "10.3390/final"
+    assert r["journal"] == "ACS Nano"
+
 def test_update_counters_meta_description():
     pub = '<meta name="description" content="96 peer-reviewed publications in nanomedicine.">'
     out_pub, _ = m.update_counters(pub, "", 98)
