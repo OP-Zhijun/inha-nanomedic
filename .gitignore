@@ -1,1 +1,8 @@
 _source/
+
+# Scholar publication-updater artifacts (never commit these)
+publication-patent.preview.html
+publication-patent.preview.html.orig
+scholar_update_report.md
+_tmp_zotero.sqlite
+scripts/__pycache__/
