@@ -37,6 +37,7 @@ jobs:
         with:
           branch: auto/publications-update
           base: main
+          assignees: inha-nanomedic
           title: "Add new publications from Google Scholar"
           body-path: scholar_update_report.md
           commit-message: "chore: add new publications from Google Scholar"
