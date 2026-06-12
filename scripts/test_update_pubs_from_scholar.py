@@ -107,6 +107,36 @@ def test_crossref_match_rejects_low_similarity():
 def test_crossref_match_empty_items():
     assert m.crossref_best_match("Anything", []) is None
 
+def test_update_counters_meta_description():
+    pub = '<meta name="description" content="96 peer-reviewed publications in nanomedicine.">'
+    out_pub, _ = m.update_counters(pub, "", 98)
+    assert "98 peer-reviewed publications" in out_pub
+    assert "96 peer-reviewed" not in out_pub
+
+def test_update_counters_index_stats_bar():
+    index = (
+        '<div class="stat-number" data-count="96">96</div>\n'
+        '            <div class="stat-label">Publications</div>'
+    )
+    _, out_index = m.update_counters("", index, 98)
+    assert 'data-count="98"' in out_index
+    assert 'data-count="96"' not in out_index
+
+def test_update_counters_only_publications_stat_and_keeps_suffix():
+    # mirrors the REAL index.html: 3 stats, Publications carries data-suffix=""
+    index = (
+        '      <div class="stat-number" data-count="20" data-suffix="+">0</div>\n'
+        '      <div class="stat-label">Years of Research</div>\n'
+        '      <div class="stat-number" data-count="96" data-suffix="">0</div>\n'
+        '      <div class="stat-label">Publications</div>\n'
+        '      <div class="stat-number" data-count="3" data-suffix="">0</div>\n'
+        '      <div class="stat-label">Research Areas</div>\n'
+    )
+    _, out = m.update_counters("", index, 98)
+    assert 'data-count="98" data-suffix=""' in out   # publications bumped, suffix kept
+    assert 'data-count="20" data-suffix="+"' in out   # Years untouched
+    assert 'data-count="3" data-suffix=""' in out     # Research Areas untouched
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))

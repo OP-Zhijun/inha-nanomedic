@@ -119,3 +119,27 @@ def crossref_best_match(title, items):
         "journal": journal_list[0].strip(),
         "year": str(year) if year else "",
     }
+
+
+def update_counters(pub_html, index_html, total_count):
+    """Return (pub_html, index_html) with both publication counters set to total_count.
+
+    Updates: (1) the meta description "<N> peer-reviewed publications" on the
+    publications page, and (2) the stats-bar data-count above "Publications" on
+    the homepage. qa_check.py independently verifies these match the row count.
+    """
+    pub_html = re.sub(
+        r'content="\d+ peer-reviewed publications',
+        f'content="{total_count} peer-reviewed publications',
+        pub_html,
+    )
+    lines = index_html.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if 'data-count="' in line and i + 1 < len(lines) and "Publications" in lines[i + 1]:
+            old = re.search(r'data-count="(\d+)"', line)
+            if old:
+                lines[i] = line.replace(
+                    f'data-count="{old.group(1)}"', f'data-count="{total_count}"'
+                )
+                break
+    return pub_html, "".join(lines)
