@@ -143,3 +143,56 @@ def update_counters(pub_html, index_html, total_count):
                 )
                 break
     return pub_html, "".join(lines)
+
+
+# ── Network wrappers (thin I/O over the pure logic above; exercised live, ──
+# ── not unit-tested). The module requires `requests` to import.          ──
+import requests  # noqa: E402
+
+SERPAPI_URL = "https://serpapi.com/search"
+CROSSREF_URL = "https://api.crossref.org/works"
+POLITE_MAILTO = "inha.nanomedic@gmail.com"  # Crossref polite pool contact
+
+
+def fetch_scholar_articles(api_key):
+    """Return [{title, year, venue}, ...] for the whole Scholar profile.
+
+    Paginates the SerpApi google_scholar_author engine until all articles are read.
+    """
+    articles, start = [], 0
+    while True:
+        params = {
+            "engine": "google_scholar_author",
+            "author_id": SCHOLAR_AUTHOR_ID,
+            "api_key": api_key,
+            "num": 100,
+            "start": start,
+            "sort": "pubdate",
+        }
+        resp = requests.get(SERPAPI_URL, params=params, timeout=60)
+        resp.raise_for_status()
+        batch = resp.json().get("articles", [])
+        if not batch:
+            break
+        for a in batch:
+            articles.append({
+                "title": (a.get("title") or "").strip(),
+                "year": str(a.get("year") or "").strip(),
+                "venue": (a.get("publication") or "").strip(),
+            })
+        if len(batch) < 100:
+            break
+        start += 100
+    return articles
+
+
+def crossref_lookup(title):
+    """Query Crossref by title; return {doi, journal, year} or None (uses the filter)."""
+    params = {"query.bibliographic": title, "rows": 5, "mailto": POLITE_MAILTO}
+    try:
+        resp = requests.get(CROSSREF_URL, params=params, timeout=60)
+        resp.raise_for_status()
+        items = resp.json().get("message", {}).get("items", [])
+    except requests.RequestException:
+        return None
+    return crossref_best_match(title, items)
