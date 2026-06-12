@@ -122,6 +122,32 @@ def test_crossref_match_prefers_journal_article_over_preprint():
     assert r["doi"] == "10.3390/final"
     assert r["journal"] == "ACS Nano"
 
+def test_crossref_match_excludes_ssrn_preprint_only():
+    # SSRN registers preprints as type "journal-article"; exclude them so the
+    # site stays peer-reviewed-only.
+    items = [_crossref_item("Cancer Stem Cell Photodynamic Therapy", "journal-article",
+                            "10.2139/ssrn.3873675", "SSRN Electronic Journal", 2021)]
+    assert m.crossref_best_match("Cancer Stem Cell Photodynamic Therapy", items) is None
+
+def test_crossref_match_prefers_real_journal_over_ssrn():
+    items = [
+        _crossref_item("Cancer Stem Cell Photodynamic Therapy", "journal-article",
+                       "10.2139/ssrn.3873675", "SSRN Electronic Journal", 2021),
+        _crossref_item("Cancer Stem Cell Photodynamic Therapy", "journal-article",
+                       "10.1016/j.jconrel.real", "Journal of Controlled Release", 2022),
+    ]
+    r = m.crossref_best_match("Cancer Stem Cell Photodynamic Therapy", items)
+    assert r is not None and r["doi"] == "10.1016/j.jconrel.real"
+
+def test_manual_review_reason_flags_allcaps_and_section_artifact():
+    assert m.manual_review_reason(
+        "PROTECTIVE EFFECT OF TPP-NIACIN ON MICROGRAVITY-INDUCED OXIDATIVE STRESS") is not None
+    assert m.manual_review_reason(
+        "Bioavailability Section-Stable bioavailability of cyclosporin A from capsules") is not None
+    # a normal mixed-case title is NOT held
+    assert m.manual_review_reason(
+        "MT1-MMP Responsive Doxorubicin Conjugated Microparticles") is None
+
 def test_update_counters_meta_description():
     pub = '<meta name="description" content="96 peer-reviewed publications in nanomedicine.">'
     out_pub, _ = m.update_counters(pub, "", 98)

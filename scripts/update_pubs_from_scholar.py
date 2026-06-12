@@ -91,6 +91,19 @@ def resort_tbody(html_content, new_row_strings):
 SIMILARITY_THRESHOLD = 0.90
 
 
+def _is_preprint(item):
+    """True for preprints (esp. SSRN, which Crossref tags as 'journal-article').
+
+    Keeps the site peer-reviewed-only: a same-title published version, if Crossref
+    also returns it, is preferred; an SSRN-only result is rejected (filtered).
+    """
+    doi = (item.get("DOI") or "").lower()
+    container = " ".join(item.get("container-title") or []).lower()
+    return (item.get("subtype") == "preprint"
+            or doi.startswith("10.2139/ssrn")
+            or "ssrn" in container)
+
+
 def crossref_best_match(title, items):
     """Pick the best Crossref item for `title`. Return {doi, journal, year} or None.
 
@@ -101,9 +114,10 @@ def crossref_best_match(title, items):
     want = normalize(title)
     best, best_score = None, 0.0
     for it in items:
-        # Only journal-articles are eligible: a same-title preprint/proceedings
-        # must never out-rank (and thereby suppress) the real journal article.
-        if it.get("type") != "journal-article":
+        # Only peer-reviewed journal-articles are eligible: a same-title
+        # preprint/proceedings/SSRN entry must never out-rank (and thereby
+        # suppress) the real journal article, nor be published itself.
+        if it.get("type") != "journal-article" or _is_preprint(it):
             continue
         cand_titles = it.get("title") or []
         if not cand_titles:
@@ -121,6 +135,21 @@ def crossref_best_match(title, items):
         "journal": journal_list[0].strip(),
         "year": str(year) if year else "",
     }
+
+
+def manual_review_reason(title):
+    """Return why a verified paper should be HELD for human review, or None.
+
+    Catches meeting-abstract-style ALL-CAPS titles and Crossref 'section-label'
+    artifacts ('... Section-...') that would display badly. These have real DOIs,
+    so they are held (not discarded) for the maintainer to confirm/clean up.
+    """
+    letters = [c for c in title if c.isalpha()]
+    if len(letters) > 20 and sum(c.isupper() for c in letters) / len(letters) > 0.85:
+        return "all-caps (likely meeting abstract)"
+    if re.search(r"\bSection-\w", title):
+        return "garbled title (Crossref section-label artifact)"
+    return None
 
 
 def update_counters(pub_html, index_html, total_count):
@@ -228,7 +257,8 @@ def build_new_rows(papers):
     return rows
 
 
-def write_report(path, added, filtered):
+def write_report(path, added, filtered, held=None):
+    held = held or []
     lines = []
     if added:
         lines.append(f"### {len(added)} new publication(s) added\n")
@@ -237,6 +267,11 @@ def write_report(path, added, filtered):
                          f"_{p['journal']}_ — https://doi.org/{p['doi']}")
     else:
         lines.append("### No new publications this run\n")
+    if held:
+        lines.append(f"\n### {len(held)} held for manual review (verified DOI — check before publishing)\n")
+        for p in held:
+            lines.append(f"- **[{p['year']}]** {p['title']}  \n  "
+                         f"_{p['journal']}_ — https://doi.org/{p['doi']}  _(reason: {p['reason']})_")
     if filtered:
         lines.append(f"\n### {len(filtered)} entr(y/ies) filtered out (NOT published — review)\n")
         for f in filtered:
@@ -280,7 +315,8 @@ def main():
         new_candidates.append(s)
     print(f"{len(new_candidates)} candidate new title(s) after diff.")
 
-    added, filtered = [], []
+    added, filtered, held = [], [], []
+    seen_dois = set()
     for s in new_candidates:
         try:
             match = crossref_lookup(s["title"])
@@ -290,26 +326,43 @@ def main():
             print(f"  ! Crossref error for {s['title'][:60]!r}: {exc}", file=sys.stderr)
             filtered.append({"title": s["title"], "reason": "crossref-error (transient — will retry)"})
             continue
-        if match and match["doi"]:
-            added.append({
-                "title": s["title"],
-                "journal": match["journal"] or s["venue"],
-                "year": match["year"] or s["year"],
-                "doi": match["doi"],
-            })
-        else:
+        if not (match and match["doi"]):
             filtered.append({"title": s["title"], "reason": "no-crossref-journal-match"})
+            continue
+        doi = match["doi"]
+        if doi in seen_dois:
+            # same paper Scholar listed twice under a title variant
+            filtered.append({"title": s["title"], "reason": f"duplicate-doi ({doi})"})
+            continue
+        seen_dois.add(doi)
+        paper = {
+            "title": s["title"],
+            "journal": match["journal"] or s["venue"],
+            "year": match["year"] or s["year"],
+            "doi": doi,
+        }
+        reason = manual_review_reason(s["title"])
+        if reason:
+            paper["reason"] = reason
+            held.append(paper)   # verified DOI, but needs a human glance — not auto-published
+        else:
+            added.append(paper)
 
     # House rule: show the first <=5 detected papers for verification.
-    print("\nFirst detected new papers (verify before publishing):")
+    print(f"\n{len(added)} verified to add, {len(held)} held for review, {len(filtered)} filtered.")
+    print("First verified new papers (verify before publishing):")
     for i, p in enumerate(added[:5], 1):
         print(f"  {i}. [{p['year']}] {p['title'][:75]}  (DOI {p['doi']})")
+    if held:
+        print(f"\n{len(held)} HELD for manual review (NOT auto-published):")
+        for p in held:
+            print(f"  - {p['title'][:75]}  ({p['reason']})")
     if filtered:
         print(f"\n{len(filtered)} filtered (not published):")
         for f in filtered[:5]:
             print(f"  - {f['title'][:75]}  ({f['reason']})")
 
-    write_report(args.report, added, filtered)
+    write_report(args.report, added, filtered, held)
 
     if not added:
         print("\nNothing verified to add. Site untouched.")
