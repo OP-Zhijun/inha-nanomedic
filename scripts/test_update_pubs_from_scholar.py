@@ -178,6 +178,24 @@ def test_update_counters_only_publications_stat_and_keeps_suffix():
     assert 'data-count="20" data-suffix="+"' in out   # Years untouched
     assert 'data-count="3" data-suffix=""' in out     # Research Areas untouched
 
+def test_already_on_site_catches_title_drift():
+    existing = [m.normalize("Beta-Lapachone Micellar Nanotherapeutics for Non-Small Cell Lung Cancer Therapy")]
+    cand = m.normalize("β-Lapachone micellar nanotherapeutics for non–small cell lung cancer therapy")
+    assert m.already_on_site(cand, existing) is True
+
+def test_already_on_site_allows_genuinely_new():
+    existing = [m.normalize("A Study Of Liposomes For Breast Cancer")]
+    cand = m.normalize("Photothermal Gold Nanorods For Colon Cancer Immunotherapy")
+    assert m.already_on_site(cand, existing) is False
+
+def test_frozen_rows_returns_pre_min_year_only_in_order():
+    rows = [
+        {"raw": "<tr>A2025</tr>", "year": 2025},
+        {"raw": "<tr>B2024</tr>", "year": 2024},
+        {"raw": "<tr>C2010</tr>", "year": 2010},
+    ]
+    assert m.frozen_rows(rows, 2025) == ["<tr>B2024</tr>", "<tr>C2010</tr>"]
+
 def test_build_new_rows_doi_link_and_escaping():
     papers = [{"title": "Nano & Cancer <Study>", "journal": "ACS Nano",
                "year": "2025", "doi": "10.1/xyz"}]

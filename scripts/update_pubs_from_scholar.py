@@ -242,6 +242,10 @@ HTML_FILE = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "publication-patent.
 INDEX_FILE = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "index.html"))
 PREVIEW_FILE = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "publication-patent.preview.html"))
 
+# Per maintainer rule: only ADD papers from this year onward; never touch the
+# curated pre-2025 rows. This also sidesteps the old-paper title-drift problem.
+MIN_YEAR = 2025
+
 
 def build_new_rows(papers):
     """Build single-line <tr> strings for verified new papers (DOI link)."""
@@ -280,6 +284,22 @@ def write_report(path, added, filtered, held=None):
         fh.write("\n".join(lines) + "\n")
 
 
+def already_on_site(norm_title, existing_norms, threshold=0.90):
+    """True if a 2025+ candidate closely matches an existing row's title.
+
+    Backstop for title drift (Greek letters, truncation, an extra word) when the
+    matching recent row has no DOI to compare against. Conservative threshold so
+    a genuinely-new paper isn't mistaken for one already present.
+    """
+    return any(SequenceMatcher(None, norm_title, e).ratio() >= threshold
+               for e in existing_norms if e)
+
+
+def frozen_rows(rows, min_year):
+    """Raw HTML of every pre-min_year row, in order — the immutable 'frozen' block."""
+    return [r["raw"] for r in rows if r["year"] < min_year]
+
+
 def main():
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group()
@@ -306,14 +326,23 @@ def main():
     scholar = fetch_scholar_articles(api_key)
     print(f"{len(scholar)} entries on Google Scholar.")
 
+    existing_norms_list = [r["norm"] for r in existing]
     new_candidates, seen = [], set()
+    skipped_old = 0
     for s in scholar:
+        yr = _year_to_int(s["year"])
+        if yr and yr < MIN_YEAR:
+            skipped_old += 1          # frozen: only 2025+ is ever considered
+            continue
         n = normalize(s["title"])
-        if not n or n in existing_norms or n in seen:
+        if not n or n in seen:
             continue
         seen.add(n)
+        if n in existing_norms or already_on_site(n, existing_norms_list):
+            continue                  # already on the site (exact or variant title)
         new_candidates.append(s)
-    print(f"{len(new_candidates)} candidate new title(s) after diff.")
+    print(f"{skipped_old} pre-{MIN_YEAR} entries frozen/ignored; "
+          f"{len(new_candidates)} candidate new {MIN_YEAR}+ title(s) after diff.")
 
     added, filtered, held = [], [], []
     seen_dois = set()
@@ -334,13 +363,16 @@ def main():
             # same paper Scholar listed twice under a title variant
             filtered.append({"title": s["title"], "reason": f"duplicate-doi ({doi})"})
             continue
-        seen_dois.add(doi)
         paper = {
             "title": s["title"],
             "journal": match["journal"] or s["venue"],
             "year": match["year"] or s["year"],
             "doi": doi,
         }
+        if _year_to_int(paper["year"]) and _year_to_int(paper["year"]) < MIN_YEAR:
+            filtered.append({"title": s["title"], "reason": f"before-{MIN_YEAR} (Crossref year)"})
+            continue
+        seen_dois.add(doi)
         reason = manual_review_reason(s["title"])
         if reason:
             paper["reason"] = reason
@@ -374,6 +406,13 @@ def main():
     with open(INDEX_FILE, encoding="utf-8") as f:
         index_html = f.read()
     new_pub_html, new_index_html = update_counters(new_pub_html, index_html, total)
+
+    # Freeze guarantee: every pre-MIN_YEAR row must survive byte-identical and in
+    # the same order. If anything would disturb the frozen block, abort — write nothing.
+    if frozen_rows(parse_existing_rows(new_pub_html), MIN_YEAR) != frozen_rows(existing, MIN_YEAR):
+        print(f"ERROR: a pre-{MIN_YEAR} row would change — aborting to protect the frozen list.",
+              file=sys.stderr)
+        sys.exit(3)
 
     if args.dry_run:
         shutil.copy2(HTML_FILE, PREVIEW_FILE + ".orig")  # keep a reference copy
