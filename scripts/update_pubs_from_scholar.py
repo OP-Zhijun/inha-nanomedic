@@ -369,8 +369,10 @@ def main():
             "year": match["year"] or s["year"],
             "doi": doi,
         }
-        if _year_to_int(paper["year"]) and _year_to_int(paper["year"]) < MIN_YEAR:
-            filtered.append({"title": s["title"], "reason": f"before-{MIN_YEAR} (Crossref year)"})
+        py = _year_to_int(paper["year"])  # 0 == no year resolved anywhere
+        if py < MIN_YEAR:
+            filtered.append({"title": s["title"],
+                             "reason": "no year resolved" if py == 0 else f"before-{MIN_YEAR}"})
             continue
         seen_dois.add(doi)
         reason = manual_review_reason(s["title"])

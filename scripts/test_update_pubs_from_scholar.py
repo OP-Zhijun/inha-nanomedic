@@ -178,6 +178,12 @@ def test_update_counters_only_publications_stat_and_keeps_suffix():
     assert 'data-count="20" data-suffix="+"' in out   # Years untouched
     assert 'data-count="3" data-suffix=""' in out     # Research Areas untouched
 
+def test_yearless_paper_is_rejected_by_min_year_gate():
+    # a paper with no resolvable year -> _year_to_int == 0 -> 0 < MIN_YEAR -> rejected
+    assert m._year_to_int("") == 0
+    assert m._year_to_int("n/a") == 0
+    assert 0 < m.MIN_YEAR
+
 def test_already_on_site_catches_title_drift():
     existing = [m.normalize("Beta-Lapachone Micellar Nanotherapeutics for Non-Small Cell Lung Cancer Therapy")]
     cand = m.normalize("β-Lapachone micellar nanotherapeutics for non–small cell lung cancer therapy")
