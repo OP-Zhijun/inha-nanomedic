@@ -86,3 +86,36 @@ def resort_tbody(html_content, new_row_strings):
         raise ValueError("tbody not found in HTML")
     end = end_raw + len("</tbody>")
     return html_content[:start] + new_tbody + html_content[end:]
+
+
+SIMILARITY_THRESHOLD = 0.90
+
+
+def crossref_best_match(title, items):
+    """Pick the best Crossref item for `title`. Return {doi, journal, year} or None.
+
+    Accept only if the best candidate is a journal-article AND its normalized
+    title is >= SIMILARITY_THRESHOLD similar. This is the junk filter: abstracts,
+    proceedings, and unrelated hits are rejected (returns None).
+    """
+    want = normalize(title)
+    best, best_score = None, 0.0
+    for it in items:
+        cand_titles = it.get("title") or []
+        if not cand_titles:
+            continue
+        score = SequenceMatcher(None, want, normalize(cand_titles[0])).ratio()
+        if score > best_score:
+            best, best_score = it, score
+    if best is None or best_score < SIMILARITY_THRESHOLD:
+        return None
+    if best.get("type") != "journal-article":
+        return None
+    journal_list = best.get("container-title") or [""]
+    parts = best.get("issued", {}).get("date-parts", [[None]])
+    year = parts[0][0] if parts and parts[0] else None
+    return {
+        "doi": best.get("DOI", "").strip(),
+        "journal": journal_list[0].strip(),
+        "year": str(year) if year else "",
+    }

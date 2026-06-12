@@ -74,6 +74,39 @@ def test_resort_raises_on_malformed_new_row():
     with pytest.raises(ValueError):
         m.resort_tbody(html, ["<tr><td colspan=2>broken</td></tr>"])
 
+def _crossref_item(title, type_, doi, journal, year):
+    return {
+        "title": [title],
+        "type": type_,
+        "DOI": doi,
+        "container-title": [journal],
+        "issued": {"date-parts": [[year]]},
+    }
+
+def test_crossref_match_accepts_close_journal_article():
+    items = [_crossref_item(
+        "Cholesterol-Conjugated Polyion Complex Nanoparticles for Colon Cancer",
+        "journal-article", "10.3390/ijms26167965",
+        "International Journal of Molecular Sciences", 2025)]
+    r = m.crossref_best_match("Cholesterol Conjugated Polyion Complex Nanoparticles for Colon Cancer", items)
+    assert r is not None
+    assert r["doi"] == "10.3390/ijms26167965"
+    assert r["journal"] == "International Journal of Molecular Sciences"
+    assert r["year"] == "2025"
+
+def test_crossref_match_rejects_non_journal_article():
+    items = [_crossref_item("Some Conference Abstract", "proceedings-article",
+                            "10.x/conf", "Proceedings of X", 2024)]
+    assert m.crossref_best_match("Some Conference Abstract", items) is None
+
+def test_crossref_match_rejects_low_similarity():
+    items = [_crossref_item("A Totally Unrelated Paper On Quantum Gravity",
+                            "journal-article", "10.x/qg", "Physics", 2024)]
+    assert m.crossref_best_match("Liposomal Doxorubicin For Breast Cancer", items) is None
+
+def test_crossref_match_empty_items():
+    assert m.crossref_best_match("Anything", []) is None
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
