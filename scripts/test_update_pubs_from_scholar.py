@@ -202,6 +202,26 @@ def test_frozen_rows_returns_pre_min_year_only_in_order():
     ]
     assert m.frozen_rows(rows, 2025) == ["<tr>B2024</tr>", "<tr>C2010</tr>"]
 
+def test_crossref_match_unescapes_journal_entities():
+    # Crossref/SerpAPI sometimes deposit the journal already HTML-escaped
+    # ("Biomolecules &amp; Therapeutics"). It must be unescaped at ingestion so
+    # build_new_rows escapes it exactly once (no "&amp;amp;" on the page).
+    items = [_crossref_item("Cellular Senescence In Pulmonary Fibrosis",
+                            "journal-article", "10.4062/biomolther.2026.004",
+                            "Biomolecules &amp; Therapeutics", 2026)]
+    r = m.crossref_best_match("Cellular Senescence In Pulmonary Fibrosis", items)
+    assert r is not None
+    assert r["journal"] == "Biomolecules & Therapeutics"
+
+def test_build_new_rows_no_double_escape_from_entity_source():
+    # Regression: a journal that arrives already-escaped must not become
+    # "&amp;amp;" (PR #3 bug). Ingestion unescapes, render escapes once.
+    papers = [{"title": "Cellular Senescence", "journal": "Biomolecules & Therapeutics",
+               "year": "2026", "doi": "10.4062/biomolther.2026.004"}]
+    row = m.build_new_rows(papers)[0]
+    assert "Biomolecules &amp; Therapeutics" in row
+    assert "&amp;amp;" not in row
+
 def test_build_new_rows_doi_link_and_escaping():
     papers = [{"title": "Nano & Cancer <Study>", "journal": "ACS Nano",
                "year": "2025", "doi": "10.1/xyz"}]
