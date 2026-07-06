@@ -132,7 +132,7 @@ def crossref_best_match(title, items):
     year = parts[0][0] if parts and parts[0] else None
     return {
         "doi": best.get("DOI", "").strip(),
-        "journal": journal_list[0].strip(),
+        "journal": html_mod.unescape(journal_list[0]).strip(),
         "year": str(year) if year else "",
     }
 
@@ -207,9 +207,9 @@ def fetch_scholar_articles(api_key):
             break
         for a in batch:
             articles.append({
-                "title": (a.get("title") or "").strip(),
+                "title": html_mod.unescape(a.get("title") or "").strip(),
                 "year": str(a.get("year") or "").strip(),
-                "venue": (a.get("publication") or "").strip(),
+                "venue": html_mod.unescape(a.get("publication") or "").strip(),
             })
         if len(batch) < 100:
             break
